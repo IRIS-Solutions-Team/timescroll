@@ -1,0 +1,32 @@
+[build-system]
+requires = [ "hatchling",]
+build-backend = "hatchling.build"
+
+[project]
+name = "timescroll"
+version = "0.1.0"
+description = "Time series analysis and visualization package"
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [ "Programming Language :: Python :: 3", "License :: OSI Approved :: MIT License", "Operating System :: OS Independent",]
+keywords = [ "time series", "data", "visualization", "analysis",]
+dependencies = []
+
+[[project.authors]]
+name = "Jaromir Benes"
+email = "jaromir.benes@gmail.com"
+
+[project.license]
+text = "MIT"
+
+[project.urls]
+Homepage = "https://github.com/iris-solutions-team/timescroll"
+Documentation = "https://iris-solutions-team.github.io/timescroll-pages"
+"Bug Tracker" = "https://github.com/iris-solutions-team/timescroll/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = [ "src/timescroll",]
+
+[tool.hatch.build.targets.sdist]
+include = [ "src/timescroll", "README.md", "LICENSE",]
+
