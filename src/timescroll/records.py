@@ -12,6 +12,9 @@ from collections import Counter, namedtuple
 # Typing imports
 from typing import Any, Iterable
 
+# Local imports
+from .meta_data import build_meta_data_class
+
 #]
 
 
@@ -20,10 +23,7 @@ __all__ = (
 )
 
 
-META_DATA_TUPLE_NAME = "MetaData"
-
-
-class _RecordTemplate:
+class RecordTemplate:
 
     __slots__ = (
         "meta_data",
@@ -33,7 +33,7 @@ class _RecordTemplate:
 
     all_fields = None
     meta_fields = None
-    _meta_data_tuple_factory = None
+    meta_data_tuple_factory = None
 
     def __init__(
         self,
@@ -46,6 +46,15 @@ class _RecordTemplate:
         self.meta_data = meta_data
         self.start_period = start_period
         self.observations = tuple(observations)
+
+    def copy(self, ) -> Self:
+        r"""
+        """
+        return type(self)(
+            meta_data=self.meta_data_tuple_factory(*self.meta_data, ),
+            start_period=self.start_period,
+            observations=tuple(self.observations),
+        )
 
     @property
     def id(self) -> int:
@@ -77,7 +86,7 @@ class _RecordTemplate:
     ) -> Self:
         r"""
         """
-        meta_data = klass._meta_data_tuple_factory(**meta_data_kwargs, )
+        meta_data = klass.meta_data_tuple_factory(**meta_data_kwargs, )
         return klass(
             meta_data=meta_data,
             start_period=start_period,
@@ -91,9 +100,9 @@ class _RecordTemplate:
     ) -> Self:
         r"""
         """
-        meta_fields = klass._meta_data_tuple_factory._fields
+        meta_fields = klass.meta_data_tuple_factory._fields
         num_meta_fields = len(meta_fields)
-        meta_data = klass._meta_data_tuple_factory(*tuple_[:num_meta_fields], )
+        meta_data = klass.meta_data_tuple_factory(*tuple_[:num_meta_fields], )
         start_period = tuple_[num_meta_fields]
         observations = tuple(tuple_[num_meta_fields+1:])
         return klass(
@@ -109,8 +118,8 @@ class _RecordTemplate:
     ) -> Self:
         r"""
         """
-        meta_fields = klass._meta_data_tuple_factory._fields
-        meta_data = klass._meta_data_tuple_factory(*(
+        meta_fields = klass.meta_data_tuple_factory._fields
+        meta_data = klass.meta_data_tuple_factory(*(
             data_dict[i] for i in meta_fields
         ))
         start_period = data_dict["start_period"]
@@ -129,7 +138,7 @@ class _RecordTemplate:
     ) -> Self:
         r"""
         """
-        meta_data, start_period, observations = other._convert(converters, )
+        meta_data, start_period, observations, = other._convert(converters, )
         return klass(
             meta_data=meta_data,
             start_period=start_period,
@@ -149,12 +158,16 @@ class _RecordTemplate:
             func = converters.get(field, None, )
             return func(value, ) if func else value
         #
-        start_period = _convert_value("start_period", self.start_period, )
-        observations = _convert_value("observations", self.observations, )
-        meta_data = self._meta_data_tuple_factory(*(
+        meta_data = self.meta_data_tuple_factory(*(
             _convert_value(field, value, )
             for field, value, in zip(self.meta_fields, self.meta_data, )
         ))
+        start_period = _convert_value("start_period", self.start_period, )
+        observations_converter = converters.get("observations", None, )
+        if observations_converter:
+            observations = tuple(observations_converter(i) for i in self.observations)
+        else:
+            observations = tuple(self.observations)
         return meta_data, start_period, observations,
 
 
@@ -182,7 +195,7 @@ class _RecordTemplate:
     ) -> None:
         r"""
         """
-        meta_data, start_period, observations = self._convert(converters, )
+        meta_data, start_period, observations, = self._convert(converters, )
         self.meta_data = meta_data
         self.start_period = start_period
         self.observations = observations
@@ -206,15 +219,15 @@ def build_record_class(
     r"""
     """
     all_fields = _assemble_all_fields(meta_fields, )
-    meta_data_tuple_factory = namedtuple(META_DATA_TUPLE_NAME, meta_fields, )
+    meta_data_tuple_factory = build_meta_data_class(meta_fields, )
     namespace = {
-        "_meta_data_tuple_factory": meta_data_tuple_factory,
+        "meta_data_tuple_factory": meta_data_tuple_factory,
         "meta_fields": meta_fields,
         "all_fields": all_fields,
     }
     return type(
         class_name,
-        (_RecordTemplate, ),
+        (RecordTemplate, ),
         namespace,
     )
 
