@@ -150,31 +150,31 @@ class Schema:
 
     def iteratate_validator_results(
         self,
-        data: namedtuple,
+        metadata_instance: namedtuple,
     ) -> Iterable[bool]:
         r"""
         """
         for i in self.fields:
-            yield self._validators[i](getattr(data, i, ), )
+            yield self._validators[i](getattr(metadata_instance, i, ), )
 
     def validate(
         self,
-        data: namedtuple,
+        metadata_instance: namedtuple,
     ) -> bool:
         r"""
         """
-        return all(self.iteratate_validator_results(data, ))
+        return all(self.iteratate_validator_results(metadata_instance, ))
 
     def validate_and_raise(
         self,
-        data: namedtuple,
+        metadata_instance: namedtuple,
     ) -> None | NoReturn:
         r"""
         """
         invalid_fields = tuple(
             i for i, is_valid, in zip(
                 self.fields,
-                self.iteratate_validator_results(data, ),
+                self.iteratate_validator_results(metadata_instance, ),
             )
             if not is_valid
         )

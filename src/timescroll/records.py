@@ -13,6 +13,7 @@ from collections import Counter, namedtuple
 from typing import Any, Iterable
 
 # Local imports
+from .schemas import Schema
 from .metadata import build_metadata_class, EmptyMetadata
 
 #]
@@ -25,11 +26,14 @@ __all__ = (
 
 class Record:
 
-    __slots__ = (
-        "metadata",
+    data_fields = (
         "start_period",
         "observations",
     )
+
+    __slots__ = (
+        "metadata",
+    ) + data_fields
 
     def __init__(
         self,
@@ -42,6 +46,15 @@ class Record:
         self.metadata = metadata
         self.start_period = start_period
         self.observations = tuple(observations)
+
+    @property
+    def all_fields(self, ) -> tuple:
+        r"""
+        """
+        return (
+            *self.metadata._fields,
+            *self.data_fields,
+        )
 
     @property
     def __hash__(self, ) -> int:
@@ -91,15 +104,21 @@ class Record:
             observations=self.observations,
         )
 
-
-def _validate_unique_fields(fields: tuple[str], ) -> tuple[str]:
-    r"""
-    """
-    #[
-    counter = Counter(fields)
-    nonunique_fields = [field for field, count in counter.items() if count > 1]
-    if nonunique_fields:
-        raise ValueError(f"Non-unique field names: {nonunique_fields}", )
-    return fields
-    #]
+    def apply_converter(
+        self,
+        converter: dict[str, Any] | None,
+    ) -> None:
+        r"""
+        """
+        if converter is None:
+            return
+        observations_converter = converter.get("observations", None)
+        if observations_converter:
+            self.observations = tuple(
+                observations_converter(i)
+                for i in self.observations
+            )
+        start_period_converter = converter.get("start_period", None)
+        if start_period_converter:
+            self.start_period = start_period_converter(self.start_period)
 
