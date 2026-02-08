@@ -60,7 +60,7 @@ class Record:
     def __hash__(self, ) -> int:
         r"""
         """
-        return hash(self.metadata) if self.metadata is not None else 0
+        return hash(self.metadata, )
 
     def __eq__(self, other, ) -> bool:
         r"""
@@ -98,6 +98,8 @@ class Record:
     def copy(self, ) -> Self:
         r"""
         """
+        # All fields are immutable, so we can just return a new instance with
+        # the same values
         return type(self)(
             metadata=self.metadata,
             start_period=self.start_period,
