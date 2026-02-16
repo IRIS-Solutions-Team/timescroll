@@ -41,9 +41,10 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -e timescroll
-          pip install pytest toml
+          pip install pytest toml pyarrow
 
       - name: Run tests
         working-directory: timescroll-tests
         run: |
           pytest
+
