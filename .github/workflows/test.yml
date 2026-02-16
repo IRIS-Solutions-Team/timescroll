@@ -25,12 +25,12 @@ jobs:
           path: timescroll
           token: ${{ secrets.IRISPIE_ACTIONS_TOKEN_2025 }}
 
-      - name: Checkout timescroll-tests/master
+      - name: Checkout timescroll-tests/develop
         uses: actions/checkout@v4
         with:
           repository: IRIS-Solutions-Team/timescroll-tests
           fetch-depth: 1
-          ref: master
+          ref: develop
           path: timescroll-tests
           token: ${{ secrets.IRISPIE_ACTIONS_TOKEN_2025 }}
 
