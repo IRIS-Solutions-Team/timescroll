@@ -1,0 +1,193 @@
+#
+# Run tests, bump version, create tag and release, and notify edition
+# repositories
+#
+
+name: Test and deploy to PYPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Type of release (major, minor, patch)'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+
+jobs:
+
+
+
+
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout timescroll/develop
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: develop
+          path: timescroll
+          token: ${{ secrets.IRISPIE_ACTIONS_TOKEN_2025 }}
+
+      - name: Checkout timescroll-tests/master
+        uses: actions/checkout@v4
+        with:
+          repository: IRIS-Solutions-Team/timescroll-tests
+          fetch-depth: 1
+          ref: master
+          path: timescroll-tests
+          token: ${{ secrets.IRISPIE_ACTIONS_TOKEN_2025 }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: |
+          pip install -e timescroll
+          pip install pytest toml
+
+      - name: Run tests
+        working-directory: timescroll-tests
+        run: |
+          pytest
+
+
+
+  bump-and-release:
+    name: Bump version and release from master
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      new-version: ${{ steps.bump-version.outputs.new-version }}
+
+    steps:
+      - name: Checkout timescroll/develop
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: develop
+          path: timescroll
+          token: ${{ secrets.IRISPIE_ACTIONS_TOKEN_2025 }}
+          repository: IRIS-Solutions-Team/timescroll
+
+      - name: Set up identity
+        working-directory: timescroll
+        run: |
+          git switch develop
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies for version bump
+        run: |
+          pip install toml
+
+      - name: Bump version in pyproject.toml
+        id: bump-version
+        working-directory: timescroll
+        run: |
+          git switch develop
+          RELEASE_TYPE="${{ github.event.inputs.release_type }}"
+          python ./.github/workflows/bump_version.py --release-type=$RELEASE_TYPE
+          NEW_VERSION=$(python ./.github/workflows/print_version.py)
+          echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Commit and push new version to develop
+        env:
+            version: ${{ steps.bump-version.outputs.new-version }}
+        working-directory: timescroll
+        run: |
+          git switch develop
+          git add ./pyproject.toml
+          git commit -m "Bump version to $version"
+          git push origin develop
+
+      - name: Merge develop into master and tag
+        env:
+            version: ${{ steps.bump-version.outputs.new-version }}
+        working-directory: timescroll
+        run: |
+          git switch master
+          git merge develop
+          git tag $version
+          git push origin master --tags
+
+      - name: Create release
+        id: create-release
+        env:
+          version: ${{ steps.bump-version.outputs.new-version }}
+          # gh picks the token from GITHUB_TOKEN env variable automatically
+          GITHUB_TOKEN: ${{ secrets.IRISPIE_ACTIONS_TOKEN_2025 }}
+        working-directory: timescroll
+        run: |
+          git switch master
+          gh release create "$version" \
+            --title "Release $version" \
+            --notes ""
+
+
+
+
+
+  deploy-to-pypi:
+    needs: bump-and-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: master
+          path: timescroll
+          token: ${{ secrets.IRISPIE_ACTIONS_TOKEN_2025 }}
+
+      - name: Set up identity
+        working-directory: timescroll
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install build dependencies
+        run: |
+            python -m pip install --upgrade pip build twine toml
+
+      - name: Get version
+        working-directory: timescroll
+        run: |
+          VERSION=$(python .github/workflows/print_version.py)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Build dist files
+        working-directory: timescroll
+        run: |
+            python -m build
+
+      - name: Upload to PYPI
+        env:
+          PYPI_TOKEN: ${{ secrets.ALL_PYPI_TOKEN_2025 }}
+        working-directory: timescroll
+        run: |
+            python -m twine upload dist/* -r pypi -u __token__ -p $PYPI_TOKEN --verbose
+
+      - name: Upload new dist as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ env.VERSION }}
+          path: timescroll/dist/*
+
